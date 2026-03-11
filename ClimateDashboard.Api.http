@@ -1,0 +1,6 @@
+@ClimateDashboard.Api_HostAddress = http://localhost:5110
+
+GET {{ClimateDashboard.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

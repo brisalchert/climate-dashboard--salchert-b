@@ -1,0 +1,40 @@
+﻿### .NET / Visual Studio ###
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bin/
+obj/
+
+# NuGet Packages
+*.nupkg
+# The packages folder can be restored via 'dotnet restore'
+packages/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docuser
+
+### JetBrains Rider ###
+# IDE settings and cache
+.idea/
+*.sln.iml
+# User-specific Rider settings
+.idea/.idea.*/.idea/contentModel.xml
+.idea/.idea.*/.idea/modules.xml
+.idea/.idea.*/.idea/workspace.xml
+
+### OS Generated Files ###
+.DS_Store
+Thumbs.db
+
+### Local Environment / Secrets ###
+# Ignore local environment settings and secrets
+.env
+appsettings.Development.json
+usersecrets.json
