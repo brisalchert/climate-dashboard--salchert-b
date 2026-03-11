@@ -32,5 +32,12 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Test
-      # Matches the Build configuration and uses the solution file
-      run: dotnet test ClimateDashboard.slnx --configuration Release --no-build --verbosity normal
+      run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+    - name: Test Report
+      uses: dorny/test-reporter@v1
+      if: always() # Run even if tests fail so we can see WHICH ones failed
+      with:
+        name: .NET Tests
+        path: "**/test-results.trx"
+        reporter: dotnet-trx
