@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.Api.Models;
+namespace ClimateDashboard.Api.Models;
 
 using System.Text.Json.Serialization;
 

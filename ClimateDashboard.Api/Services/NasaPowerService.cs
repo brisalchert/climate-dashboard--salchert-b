@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.Api.Services;
+namespace ClimateDashboard.Api.Services;
 
 using Models;
 

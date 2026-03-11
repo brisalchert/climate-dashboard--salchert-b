@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.Test.Tests;
+namespace ClimateDashboard.Tests;
 
 using System.Net;
 using System.Net.Http.Json;
@@ -18,23 +18,23 @@ public class NasaPowerServiceTests
 
     // We simulate the NASA JSON response structure
     var fakeResponse = new NasaResponse(
-        new NasaProperties(new Dictionary<string, Dictionary<string, double>>
-        {
-            ["ALLSKY_SFC_SW_DWN"] = new() { ["20230101"] = 5.5 }
-        })
+      new NasaProperties(new Dictionary<string, Dictionary<string, double>>
+      {
+        ["ALLSKY_SFC_SW_DWN"] = new() { ["20230101"] = 5.5 }
+      })
     );
 
     mockHandler.Protected()
-        .Setup<Task<HttpResponseMessage>>(
-            "SendAsync",
-            ItExpr.IsAny<HttpRequestMessage>(),
-            ItExpr.IsAny<CancellationToken>()
-        )
-        .ReturnsAsync(new HttpResponseMessage
-        {
-            StatusCode = HttpStatusCode.OK,
-            Content = JsonContent.Create(fakeResponse)
-        });
+      .Setup<Task<HttpResponseMessage>>(
+        "SendAsync",
+        ItExpr.IsAny<HttpRequestMessage>(),
+        ItExpr.IsAny<CancellationToken>()
+      )
+      .ReturnsAsync(new HttpResponseMessage
+      {
+        StatusCode = HttpStatusCode.OK,
+        Content = JsonContent.Create(fakeResponse)
+      });
 
     var httpClient = new HttpClient(mockHandler.Object);
     var service = new NasaPowerService(httpClient);

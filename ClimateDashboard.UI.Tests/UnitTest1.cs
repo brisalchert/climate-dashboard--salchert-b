@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.UI.Tests;
+namespace ClimateDashboard.UI.Tests;
 
 using Bunit;
 using Pages;

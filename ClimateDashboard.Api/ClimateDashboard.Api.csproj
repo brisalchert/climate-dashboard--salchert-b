@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ClimateDashboard.Shared\ClimateDashboard.Shared.csproj" />
+    <ProjectReference Include="..\ClimateDashboard.Shared\ClimateDashboard.Shared.csproj"/>
   </ItemGroup>
 
 </Project>
