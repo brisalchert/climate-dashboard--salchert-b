@@ -11,20 +11,26 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
-    - name: Check Formatting
-      run: dotnet format --verify-no-changes
+
     - name: Restore dependencies
       run: dotnet restore
+
+    - name: Check Formatting
+      run: dotnet format --verify-no-changes --no-restore
+
     - name: Build
+      # Changed to Release for consistency
       run: dotnet build --no-restore --configuration Release
+
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      # Matches the Build configuration and uses the solution file
+      run: dotnet test ClimateDashboard.slnx --configuration Release --no-build --verbosity normal
