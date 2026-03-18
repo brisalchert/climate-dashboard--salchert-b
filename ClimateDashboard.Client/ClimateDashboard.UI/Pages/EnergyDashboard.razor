@@ -1,0 +1,54 @@
+﻿@page "/energy"
+@rendermode InteractiveWebAssembly
+@inject HttpClient Http
+
+<PageTitle>Renewable Energy Dashboard</PageTitle>
+
+<h1>Climate Science Data</h1>
+
+<div class="card p-3">
+  <button class="btn btn-primary" @onclick="FetchData" disabled="@_isLoading">
+    @if (_isLoading)
+    {
+      <span>Loading...</span>
+    }
+    else
+    {
+      <span>Fetch Nasa Data</span>
+    }
+  </button>
+
+  @if (_solarAverage.HasValue)
+  {
+    <div class="mt-4">
+      <h3>Results for Selected Region:</h3>
+      <p><strong>Average Solar Intensity:</strong> @_solarAverage.Value.ToString("F2") kWh/m²/day</p>
+    </div>
+  }
+  else if (_hasError)
+  {
+    <p class="text-danger mt-3">Error fetching data. Please check your connection.</p>
+  }
+</div>
+
+@code {
+  private double? _solarAverage;
+  private bool _isLoading;
+  private bool _hasError;
+
+  private async Task FetchData()
+  {
+    _isLoading = true;
+    try
+    {
+      var url = "api/data?latitude=42.36&longitude=-71.05";
+      _solarAverage = await Http.GetFromJsonAsync<double>(url);
+    }
+    catch (Exception e)
+    {
+      _hasError = true;
+      Console.WriteLine($"Error: {e.Message}");
+    }
+    finally { _isLoading = false; }
+  }
+}

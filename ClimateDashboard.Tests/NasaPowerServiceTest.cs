@@ -2,8 +2,8 @@ namespace ClimateDashboard.Tests;
 
 using System.Net;
 using System.Net.Http.Json;
-using Api.Models;
-using Api.Services;
+using Shared.Services;
+using Shared.Models;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;

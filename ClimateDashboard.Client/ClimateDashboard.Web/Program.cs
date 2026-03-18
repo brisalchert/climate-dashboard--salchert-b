@@ -1,10 +1,14 @@
+using ClimateDashboard.Shared.Services;
 using ClimateDashboard.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
+  .AddInteractiveWebAssemblyComponents();
+
+// Register NasaPowerService
+builder.Services.AddHttpClient<NasaPowerService>();
 
 var app = builder.Build();
 
@@ -25,9 +29,16 @@ app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
+app.MapGet("/api/data", async (double latitude, double longitude, NasaPowerService nasaService) =>
+{
+  // The Web project runs the service, which calls NASA's absolute URL
+  var intensity = await nasaService.GetSolarIntensityAsync(latitude, longitude);
+  return Results.Ok(intensity);
+});
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(ClimateDashboard.UI._Imports).Assembly);
+  .AddInteractiveWebAssemblyRenderMode()
+  .AddAdditionalAssemblies(typeof(ClimateDashboard.UI._Imports).Assembly);
 
 app.Run();

@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ClimateDashboard.Api\ClimateDashboard.Api.csproj"/>
+    <ProjectReference Include="..\ClimateDashboard.Shared\ClimateDashboard.Shared.csproj" />
   </ItemGroup>
 
 </Project>
