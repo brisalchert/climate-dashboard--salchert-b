@@ -17,8 +17,8 @@ public class NasaPowerServiceTests
     var mockHandler = new Mock<HttpMessageHandler>();
 
     // We simulate the NASA JSON response structure
-    var fakeResponse = new NasaResponse(
-      new NasaProperties(new Dictionary<string, Dictionary<string, double>>
+    var fakeResponse = new NasaSolarPointResponse(
+      new NasaSolarPointProperties(new Dictionary<string, Dictionary<string, double>>
       {
         ["ALLSKY_SFC_SW_DWN"] = new() { ["20230101"] = 5.5 }
       })
@@ -40,7 +40,7 @@ public class NasaPowerServiceTests
     var service = new NasaPowerService(httpClient);
 
     // Act
-    var result = await service.GetSolarIntensityAsync(0, 0);
+    var result = await service.GetSolarPointAsync(0, 0, new DateTime());
 
     // Assert
     result.Should().Be(5.5);
