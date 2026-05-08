@@ -4,10 +4,12 @@ using System.Text.Json.Serialization;
 
 public record NasaSolarPointResponse(
   [property: JsonPropertyName("properties")]
-  NasaSolarPointProperties Properties
+  NasaSolarProperties Properties,
+  [property: JsonPropertyName("geometry")]
+  NasaSolarGeometry Geometry
 );
 
-public record NasaSolarPointProperties(
+public record NasaSolarProperties(
   [property: JsonPropertyName("parameter")]
   Dictionary<string, Dictionary<string, double>> Parameter
 );
@@ -19,20 +21,12 @@ public record NasaSolarRegionResponse(
 
 public record NasaSolarRegionFeature(
   [property: JsonPropertyName("geometry")]
-  NasaSolarRegionGeometry Geometry,
+  NasaSolarGeometry Geometry,
   [property: JsonPropertyName("properties")]
-  NasaSolarPointProperties Properties
+  NasaSolarProperties Properties
 );
 
-public record NasaSolarRegionGeometry(
+public record NasaSolarGeometry(
   [property: JsonPropertyName("coordinates")]
-  double[] Coordinates
+  List<double> Coordinates
 );
-
-public class SolarPoint
-{
-  public double Latitude { get; init; }
-  public double Longitude { get; init; }
-  public double Elevation { get; init; }
-  public double Intensity { get; init; }
-}

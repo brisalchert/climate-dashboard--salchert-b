@@ -26,6 +26,26 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # Standard LTS version for React/Vite
+
+    - name: Install Frontend Dependencies
+      run: |
+        cd client-app
+        npm install
+
+    - name: Lint/Check Frontend
+      run: |
+        cd client-app
+        npm run lint
+
+    - name: Build Frontend
+      run: |
+        cd client-app
+        npm run build
+
     - name: Restore dependencies
       run: dotnet restore
 

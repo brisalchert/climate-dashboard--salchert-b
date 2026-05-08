@@ -11,17 +11,18 @@ using Moq.Protected;
 public class NasaPowerServiceTests
 {
   [Fact]
-  public async Task GetSolarIntensityAsync_ReturnsCorrectValue_WhenApiSucceeds()
+  public async Task GetSolarIntensityAsync_ReturnsFullObject_WhenApiSucceeds()
   {
     // Arrange
     var mockHandler = new Mock<HttpMessageHandler>();
 
     // We simulate the NASA JSON response structure
     var fakeResponse = new NasaSolarPointResponse(
-      new NasaSolarPointProperties(new Dictionary<string, Dictionary<string, double>>
+      new NasaSolarProperties(new Dictionary<string, Dictionary<string, double>>
       {
         ["ALLSKY_SFC_SW_DWN"] = new() { ["20230101"] = 5.5 }
-      })
+      }),
+      new NasaSolarGeometry(new List<double> { -89.5, 40.5, 180.0 })
     );
 
     mockHandler.Protected()
@@ -40,9 +41,13 @@ public class NasaPowerServiceTests
     var service = new NasaPowerService(httpClient);
 
     // Act
-    var result = await service.GetSolarPointAsync(0, 0, new DateTime());
+    var result = await service.GetSolarPointAsync(40.5, -89.5, new DateTime(2023, 1, 1));
 
     // Assert
-    result.Should().Be(5.5);
+    result.Should().NotBeNull();
+    result.Intensity.Should().Be(5.5);
+    result.Latitude.Should().Be(40.5);
+    result.Longitude.Should().Be(-89.5);
+    result.Elevation.Should().Be(180.0);
   }
 }

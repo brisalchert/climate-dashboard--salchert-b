@@ -1,7 +1,5 @@
 <Solution>
-  <Project Path="ClimateDashboard.Client/ClimateDashboard.UI/ClimateDashboard.UI.csproj" />
-  <Project Path="ClimateDashboard.Client/ClimateDashboard.Web/ClimateDashboard.Web.csproj" />
-  <Project Path="ClimateDashboard.Shared/ClimateDashboard.Shared.csproj" />
-  <Project Path="ClimateDashboard.Tests/ClimateDashboard.Tests.csproj" />
-  <Project Path="ClimateDashboard.UI.Tests/ClimateDashboard.UI.Tests.csproj" />
+  <Project Path="ClimateDashboard.Api/ClimateDashboard.Api.csproj"/>
+  <Project Path="ClimateDashboard.Shared/ClimateDashboard.Shared.csproj"/>
+  <Project Path="ClimateDashboard.Tests/ClimateDashboard.Tests.csproj"/>
 </Solution>

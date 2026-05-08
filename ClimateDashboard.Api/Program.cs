@@ -2,41 +2,48 @@ using ClimateDashboard.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Add Controller Support
+builder.Services.AddControllers();
 
-// Add CORS services and define a policy
+// Register NasaPowerService
+builder.Services.AddHttpClient<NasaPowerService>();
+
+// Add CORS Policy
 builder.Services.AddCors(options =>
 {
-  options.AddPolicy("AllowSpecificOrigin",
-    policy =>
-    {
-      policy.WithOrigins("http://localhost:7125")
-        .AllowAnyHeader()
-        .AllowAnyMethod();
-    });
+  options.AddPolicy("AllowReactApp", policy =>
+  {
+    policy.WithOrigins("http://localhost:5173") // Vite's default port
+      .AllowAnyHeader()
+      .AllowAnyMethod();
+  });
 });
-
-builder.Services.AddHttpClient<NasaPowerService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+// --- Middleware Pipeline ---
 
-// Enable the CORS policy
-app.UseCors("AllowSpecificOrigin");
-
-// Other middleware (HTTPS redirection, etc.)
-app.UseHttpsRedirection();
-app.UseAuthorization();
-
-app.MapGet("/api/data", async (double latitude, double longitude, NasaPowerService nasaService) =>
+if (app.Environment.IsDevelopment())
 {
-  // The API project runs the service, which calls NASA's absolute URL
-  var intensity = await nasaService.GetSolarIntensityAsync(latitude, longitude);
-  return Results.Ok(intensity);
-});
+  app.UseDeveloperExceptionPage(); // Shows detailed error JSON in development
+}
+else
+{
+  app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+
+// Use the CORS policy before mapping controllers
+app.UseCors("AllowReactApp");
+
+app.UseRouting();
+
+// Map the Controllers
+app.MapControllers();
+
+// Final Fallback
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 app.Run();
