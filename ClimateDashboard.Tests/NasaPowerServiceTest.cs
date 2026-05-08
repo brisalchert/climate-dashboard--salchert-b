@@ -22,7 +22,7 @@ public class NasaPowerServiceTests
       {
         ["ALLSKY_SFC_SW_DWN"] = new() { ["20230101"] = 5.5 }
       }),
-      new NasaSolarGeometry(new List<double> { -89.5, 40.5, 180.0 })
+      new NasaSolarGeometry([-89.5, 40.5, 180.0])
     );
 
     mockHandler.Protected()

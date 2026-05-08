@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.Api.Controllers;
+namespace ClimateDashboard.Api.Controllers;
 
 using Shared.Services;
 using Microsoft.AspNetCore.Mvc;

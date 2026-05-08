@@ -1,4 +1,4 @@
-﻿namespace ClimateDashboard.Shared.Models;
+namespace ClimateDashboard.Shared.Models;
 
 public class SolarPoint
 {
