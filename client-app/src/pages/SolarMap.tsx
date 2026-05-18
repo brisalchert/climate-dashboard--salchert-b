@@ -13,9 +13,6 @@ function SolarMap() {
   useEffect(() => {
     if (!clickedLocation) return;
 
-    setLoading(true);
-    setError(null);
-
     const date = '2025-06-01';
     const {lng, lat} = clickedLocation;
 
@@ -32,6 +29,10 @@ function SolarMap() {
 
   const handleMapClick = (event: MapLayerMouseEvent) => {
     const {lng, lat} = event.lngLat;
+
+    setLoading(true);
+    setError(null);
+
     setClickedLocation({lng, lat})
   };
 
