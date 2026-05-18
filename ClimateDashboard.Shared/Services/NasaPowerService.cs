@@ -6,14 +6,14 @@ using Models;
 
 public class NasaPowerService(HttpClient httpClient)
 {
-  public async Task<SolarPoint> GetSolarPointAsync(double latitude, double longitude, DateTime date)
+  public async Task<SolarPoint> GetSolarPointAsync(double longitude, double latitude, DateTime date)
   {
     // Convert datetime to proper format
     var formattedDate = date.ToString("yyyyMMdd");
 
     // HTTP request for single-point daily downward solar irradiance
     var url = $"https://power.larc.nasa.gov/api/temporal/daily/point" +
-              $"?latitude={latitude}&longitude={longitude}" +
+              $"?longitude={longitude}&latitude={latitude}" +
               $"&parameters=ALLSKY_SFC_SW_DWN&community=RE&format=JSON" +
               $"&start={formattedDate}&end={formattedDate}";
 
@@ -40,13 +40,13 @@ public class NasaPowerService(HttpClient httpClient)
     };
   }
 
-  public async Task<List<SolarPoint>> GetNasaSolarRegionAsync(double latitudeMin,
-    double latitudeMax, double longitudeMin, double longitudeMax, DateTime date)
+  public async Task<List<SolarPoint>> GetNasaSolarRegionAsync(double longitudeMin, double longitudeMax,
+    double latitudeMin, double latitudeMax, DateTime date)
   {
     if (latitudeMin > latitudeMax || longitudeMin > longitudeMax)
     {
       throw new Exception(
-        $"Invalid coordinate ranges provided: {latitudeMin}, {longitudeMin} to {latitudeMax}, {longitudeMax}");
+        $"Invalid coordinate ranges provided: {longitudeMin}, {latitudeMin} to {longitudeMax}, {latitudeMax}");
     }
 
     // Convert datetime to proper format
@@ -55,8 +55,8 @@ public class NasaPowerService(HttpClient httpClient)
     // HTTP request for region daily downward solar irradiance
     var url = $"https://power.larc.nasa.gov/api/temporal/daily/regional" +
               $"?start={formattedDate}&end={formattedDate}" +
-              $"&latitude-min={latitudeMin}&latitude-max={latitudeMax}" +
               $"&longitude-min={longitudeMin}&longitude-max={longitudeMax}" +
+              $"&latitude-min={latitudeMin}&latitude-max={latitudeMax}" +
               $"&community=ag&parameters=ALLSKY_SFC_SW_DWN&header=true";
 
     // Case-insensitive matching helps prevent 500 errors during deserialization
