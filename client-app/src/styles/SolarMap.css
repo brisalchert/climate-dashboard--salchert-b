@@ -3,3 +3,45 @@
   width: 100%;
   height: 100%;
 }
+
+.map-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1;
+  background: rgba(30, 30, 30, 0.85);
+  color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  font-family: sans-serif;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.map-overlay-title {
+  margin: 0 0 10px 0;
+}
+
+.map-overlay-description {
+  margin: 0;
+  font-size: 14px;
+  color: #aaa;
+}
+
+.loading-label {
+  color: #e67e22;
+}
+
+.error-label {
+  color: #e74c3c;
+}
+
+.solar-data-container {
+  border-top: 1px solid #444;
+  padding-top: 10px;
+}
+
+.solar-intensity-label {
+  color: #f1c40f;
+  font-size: 16px;
+}

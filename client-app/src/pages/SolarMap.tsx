@@ -39,33 +39,21 @@ function SolarMap() {
   return (
     <div className={"map-canvas"}>
       {/* Sidebar Overlay for future controls */}
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        left: 20,
-        zIndex: 1,
-        background: 'rgba(30, 30, 30, 0.85)',
-        color: '#fff',
-        padding: '20px',
-        borderRadius: '8px',
-        fontFamily: 'sans-serif',
-        backdropFilter: 'blur(4px)',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-      }}>
-        <h2 style={{margin: '0 0 10px 0'}}>Climate Dashboard</h2>
-        <p style={{margin: 0, fontSize: '14px', color: '#aaa'}}>
+      <div className={"map-overlay"}>
+        <h2 className={"map-overlay-title"}>Climate Dashboard</h2>
+        <p className={"map-overlay-description"}>
           Click anywhere on the map to fetch live NASA solar irradiance data.
         </p>
 
-        {loading && <p style={{color: '#e67e22'}}>Querying C# API & NASA...</p>}
-        {error && <p style={{color: '#e74c3c'}}>Error: {error}</p>}
+        {loading && <p className={"loading-label"}>Querying C# API & NASA...</p>}
+        {error && <p className={"error-label"}>Error: {error}</p>}
 
         {data && !loading && (
-          <div style={{borderTop: '1px solid #444', paddingTop: '10px'}}>
+          <div className={"solar-data-container"}>
             <p><strong>Latitude:</strong> {data.latitude.toFixed(4)}</p>
             <p><strong>Longitude:</strong> {data.longitude.toFixed(4)}</p>
             <p><strong>Elevation:</strong> {data.elevation}m</p>
-            <p style={{color: '#f1c40f', fontSize: '16px'}}>
+            <p className={"solar-intensity-label"}>
               <strong>Intensity:</strong> {data.intensity.toFixed(2)} kW-hr/m²/day
             </p>
           </div>
