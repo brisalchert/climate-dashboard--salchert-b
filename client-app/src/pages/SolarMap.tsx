@@ -9,9 +9,12 @@ function SolarMap() {
     // Create a grid over the US
     for (let lng = -125; lng <= -70; lng += 1) {
       for (let lat = 25; lat <= 50; lat += 1) {
-        // Fake intensity: hotter in the Southwest (closer to lat 30, lng -110)
+        // Fake intensity: hotter in the Southwest (closer to lat 35, lng -110)
         const distToDesert = Math.sqrt(Math.pow(lat - 35, 2) + Math.pow(lng - -110, 2));
-        const intensity = Math.max(0, 10 - distToDesert * 0.3) + Math.random();
+
+        const pseudoRandomNoise = Math.sin(lat * 12.9898 + lng * 78.233) * 0.5;
+
+        const intensity = Math.max(0, 10 - distToDesert * 0.3) + Math.abs(pseudoRandomNoise);
 
         points.push({longitude: lng, latitude: lat, intensity: intensity});
       }
