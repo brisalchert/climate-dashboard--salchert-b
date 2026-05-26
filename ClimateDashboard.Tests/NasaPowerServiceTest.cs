@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using Shared.Services;
 using Shared.Models;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using Moq.Protected;
 
@@ -38,7 +39,8 @@ public class NasaPowerServiceTests
       });
 
     var httpClient = new HttpClient(mockHandler.Object);
-    var service = new NasaPowerService(httpClient);
+    var memoryCache = new MemoryCache(new MemoryCacheOptions());
+    var service = new NasaPowerService(httpClient, memoryCache);
 
     // Act
     var result = await service.GetSolarPointAsync(40.5, -89.5, new DateTime(2023, 1, 1));

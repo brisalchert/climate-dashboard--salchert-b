@@ -2,9 +2,21 @@ namespace ClimateDashboard.Shared.Services;
 
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Models;
 
-public class NasaPowerService(HttpClient httpClient)
+public interface INasaPowerService
+{
+  Task<SolarPoint> GetSolarPointAsync(double longitude, double latitude, DateTime date);
+
+  Task<List<SolarPoint>> GetNasaSolarRegionAsync(double longitudeMin, double longitudeMax, double latitudeMin,
+    double latitudeMax, DateTime date);
+}
+
+internal class NasaPowerService(
+  HttpClient httpClient,
+  IMemoryCache cache
+) : INasaPowerService
 {
   public async Task<SolarPoint> GetSolarPointAsync(double longitude, double latitude, DateTime date)
   {
@@ -49,6 +61,13 @@ public class NasaPowerService(HttpClient httpClient)
         $"Invalid coordinate ranges provided: {longitudeMin}, {latitudeMin} to {longitudeMax}, {latitudeMax}");
     }
 
+    string cacheKey = $"solar_{longitudeMin}_{longitudeMax}_{latitudeMin}_{latitudeMax}_{date:yyyyMMdd}";
+
+    if (cache.TryGetValue(cacheKey, out List<SolarPoint>? cachedFeatures) && cachedFeatures != null)
+    {
+      return cachedFeatures;
+    }
+
     // Convert datetime to proper format
     var formattedDate = date.ToString("yyyyMMdd");
 
@@ -74,12 +93,16 @@ public class NasaPowerService(HttpClient httpClient)
     if (data?.Features == null) return [];
 
     // NASA's daily regional solar data returns coordinates paired with
-    return data.Features.Select(feature => new SolarPoint
+    var freshFeatures = data.Features.Select(feature => new SolarPoint
     {
       Longitude = feature.Geometry.Coordinates[0],
       Latitude = feature.Geometry.Coordinates[1],
       Elevation = feature.Geometry.Coordinates[2],
       Intensity = feature.Properties.Parameter["ALLSKY_SFC_SW_DWN"].Values.FirstOrDefault()
     }).ToList();
+
+    cache.Set(cacheKey, freshFeatures, TimeSpan.FromHours(24));
+
+    return freshFeatures;
   }
 }

@@ -1,12 +1,15 @@
-using ClimateDashboard.Shared.Services;
+using ClimateDashboard.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Controller Support
 builder.Services.AddControllers();
 
-// Register NasaPowerService
-builder.Services.AddHttpClient<NasaPowerService>();
+// Register Services
+builder.Services.AddSharedServices();
+
+// Add Memory Caching
+builder.Services.AddMemoryCache();
 
 // Add CORS Policy
 builder.Services.AddCors(options =>

@@ -1,88 +1,247 @@
-﻿import Map, {Source, Layer, type LayerProps} from 'react-map-gl/maplibre';
+﻿import Map, {Source, Layer, type LayerProps, type MapRef} from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import type {FeatureCollection, Feature, Point} from 'geojson';
 import '../styles/SolarMap.css'
-import {useMemo} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {getSolarRegionData} from "../services/SolarData.ts";
 
 function SolarMap() {
-  const dummyData = useMemo(() => {
-    const points = [];
-    // Create a grid over the US
-    for (let lng = -125; lng <= -70; lng += 1) {
-      for (let lat = 25; lat <= 50; lat += 1) {
-        // Fake intensity: hotter in the Southwest (closer to lat 35, lng -110)
-        const distToDesert = Math.sqrt(Math.pow(lat - 35, 2) + Math.pow(lng - -110, 2));
+  const [solarData, setSolarData] = useState<FeatureCollection<Point>>({
+    type: 'FeatureCollection',
+    features: []
+  });
+  const mapRef = useRef<MapRef | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedBoundsRef = useRef<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-        const pseudoRandomNoise = Math.sin(lat * 12.9898 + lng * 78.233) * 0.5;
+  const fetchMapBoundsData = useCallback(async (map: MapRef) => {
+    const bounds = map.getBounds();
+    const lonMin = bounds.getWest();
+    const lonMax = bounds.getEast();
+    const latMin = bounds.getSouth();
+    const latMax = bounds.getNorth();
+    const date = "2026-04-08";
 
-        const intensity = Math.max(0, 10 - distToDesert * 0.3) + Math.abs(pseudoRandomNoise);
+    const currentBoundsSignature = `${Math.round(lonMin)},${Math.round(lonMax)},${Math.round(latMin)},${Math.round(latMax)}`;
 
-        points.push({longitude: lng, latitude: lat, intensity: intensity});
-      }
+    // If map layout has not changed, do not fetch data
+    if (currentBoundsSignature === lastFetchedBoundsRef.current) {
+      return;
     }
-    return points;
+
+    setLoading(true);
+    setError(null);
+    lastFetchedBoundsRef.current = currentBoundsSignature;
+
+    try {
+      if (map.getZoom() < 3) {
+        setError("Zoom in further to load regional data.")
+        setLoading(false);
+        return;
+      }
+
+      // Open the long-lived HTTP stream connection
+      const response = await getSolarRegionData(lonMin, lonMax, latMin, latMax, date)
+
+      if (!response.body) return;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedFeatures: Feature<Point>[] = [];
+
+      let streamBuffer = "";
+
+      // Read incoming chunk streams continuously in the background
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+
+        streamBuffer += decoder.decode(value, { stream: true });
+        const lines = streamBuffer.split('\n');
+        streamBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+
+          if (trimmedLine.startsWith('data: ')) {
+            try {
+              const jsonPayload = trimmedLine.substring(6);
+              if (!jsonPayload) continue;
+
+              const rawChunkPoints = JSON.parse(jsonPayload);
+
+              // Map the fresh batch
+              const newFeatures = rawChunkPoints.map((f: Record<string, number | undefined>) => {
+                const lon = f.longitude !== undefined ? f.longitude : f.Longitude;
+                const lat = f.latitude !== undefined ? f.latitude : f.Latitude;
+                const intensity = f.intensity !== undefined ? f.intensity : f.Intensity;
+
+                return {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [lon, lat]
+                  },
+                  properties: { intensity: intensity }
+                };
+              });
+
+              accumulatedFeatures = [...accumulatedFeatures, ...newFeatures];
+
+              setSolarData({
+                type: 'FeatureCollection',
+                features: accumulatedFeatures
+              });
+            } catch (e) {
+              console.warn("Skipped a malformed or partial line segment:", e);
+            }
+          }
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load climate data.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const geoJsonData = useMemo(() => {
-    return {
-      type: 'FeatureCollection' as const,
-      features: dummyData.map((point) => ({
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [point.longitude, point.latitude],
-        },
-        properties: {
-          // This is the crucial value the heatmap will read
-          intensity: point.intensity,
-        },
-      })),
+  const handleMapIdle = useCallback(() => {
+    // Clear old active timers
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      if (mapRef.current) {
+        fetchMapBoundsData(mapRef.current);
+      }
+    }, 600);
+  }, [fetchMapBoundsData]);
+
+  // Clean up timers if the component unmounts mid-drag to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [dummyData]);
+  }, []);
 
   const heatmapLayer: LayerProps = {
-    id: 'solar-heatmap',
-    type: 'heatmap',
-    paint: {
-      // Weight determines how "hot" a single point is based on its intensity property (0 to 10 scale)
+    'id': 'solar-heatmap',
+    'type': 'heatmap',
+    'maxzoom': 9,
+    'paint': {
+      // Weight determines how "hot" a single point is based on its intensity property
       'heatmap-weight': [
-        'interpolate', ['linear'], ['get', 'intensity'],
+        'interpolate',
+        ['linear'],
+        ['get', 'intensity'],
         0, 0,
-        10, 1
+        25, 1
+      ],
+      // Increase the heatmap color weight by zoom level
+      'heatmap-intensity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        0, 1,
+        9, 3
       ],
       // The color gradient of the heatmap (Transparent -> Blue -> Yellow -> Red)
       'heatmap-color': [
-        'interpolate', ['linear'], ['heatmap-density'],
+        'interpolate',
+        ['linear'],
+        ['heatmap-density'],
         0, 'rgba(33,102,172,0)',
-        0.1, 'rgb(103,169,207)',
-        0.3, 'rgb(209,229,240)',
-        0.5, 'rgb(253,219,199)',
-        1, 'rgb(227, 26, 28)'
+        0.2, 'rgb(103,169,207)',
+        0.4, 'rgb(209,229,240)',
+        0.6, 'rgb(253,219,199)',
+        0.8, 'rgb(239,138,98)',
+        1, 'rgb(178,24,43)'
       ],
-      // How wide each point's heat spreads (in pixels)
-      'heatmap-radius': 30,
-      // Global opacity of the layer
-      'heatmap-opacity': 0.6
+      // Adjust the heatmap radius by zoom level
+      'heatmap-radius': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        0, 2,
+        9, 20
+      ],
+      // Transition from heatmap to circle layer by zoom level
+      'heatmap-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        7, 1,
+        9, 0
+      ]
     }
   };
+
+  const circleLayer: LayerProps = {
+    'id': 'solar-points',
+    'type': 'circle',
+    'minzoom': 7,
+    'paint': {
+      // Size circle radius by earthquake magnitude and zoom level
+      'circle-radius': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        7, ['interpolate', ['linear'], ['get', 'intensity'], 1, 1, 6, 4],
+        16, ['interpolate', ['linear'], ['get', 'intensity'], 1, 5, 6, 50]
+      ],
+      // Color circle by solar intensity
+      'circle-color': [
+        'interpolate',
+        ['linear'],
+        ['get', 'intensity'],
+        1, 'rgba(33,102,172,0)',
+        2, 'rgb(103,169,207)',
+        3, 'rgb(209,229,240)',
+        4, 'rgb(253,219,199)',
+        5, 'rgb(239,138,98)',
+        6, 'rgb(178,24,43)'
+      ],
+      'circle-stroke-color': 'white',
+      'circle-stroke-width': 1,
+      // Transition from heatmap to circle layer by zoom level
+      'circle-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        7, 0,
+        8, 1
+      ]
+    }
+  }
 
   return (
     <div className={"map-canvas"}>
       {/* Sidebar Overlay for future controls */}
       <div className={"map-overlay"}>
         <h2 className={"map-overlay-title"}>Climate Dashboard</h2>
-        <p className={"map-overlay-description"}>
-          Displaying {dummyData.length} data points rendered via WebGL.
-        </p>
+        {loading && <p className={"map-overlay-description"}>Loading regional metrics...</p>}
+        {error && <p className={"map-overlay-description"} style={{color: '#e74c3c'}}>{error}</p>}
+        {!loading && (
+          <p className={"map-overlay-description"}>
+            Displaying {solarData.features.length} data points rendered via WebGL.
+          </p>
+        )}
       </div>
 
       {/* Interactive Map Canvas */}
       <Map
-        initialViewState={{longitude: -95, latitude: 38, zoom: 3.5}}
+        ref={mapRef}
+        initialViewState={{longitude: -95, latitude: 38, zoom: 4.5}}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+        onIdle={handleMapIdle}
       >
         {/* Render the Heatmap Source and Layer */}
-        <Source id="solar-data" type="geojson" data={geoJsonData}>
+        <Source id="solar-data" type="geojson" data={solarData}>
           <Layer {...heatmapLayer} />
+          <Layer {...circleLayer} />
         </Source>
       </Map>
     </div>

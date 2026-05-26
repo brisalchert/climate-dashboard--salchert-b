@@ -1,5 +1,5 @@
 ﻿import {useEffect, useState} from "react";
-import type {SolarPoint} from "../models/SolarData.ts";
+import type {SolarPoint} from "../models/SolarPoint.ts";
 import {getSolarPointData} from "../services/SolarData.ts";
 
 function Solar() {

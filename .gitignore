@@ -6,6 +6,9 @@
 # Ignore third-party libraries managed by LibMan
 **/wwwroot/lib/
 
+# Run checks script
+run-checks.ps1
+
 # dotenv files
 .env
 
