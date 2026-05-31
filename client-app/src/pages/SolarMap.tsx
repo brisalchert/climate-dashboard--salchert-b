@@ -3,7 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type {FeatureCollection, Feature, Point} from 'geojson';
 import '../styles/SolarMap.css'
 import {useCallback, useEffect, useRef, useState} from "react";
-import {getSolarRegionData} from "../services/SolarData.ts";
+import {getSolarRegionData, mapRawPointsToGeoJsonFeatures} from "../services/SolarData.ts";
 
 function SolarMap() {
   const [solarData, setSolarData] = useState<FeatureCollection<Point>>({
@@ -36,12 +36,6 @@ function SolarMap() {
     lastFetchedBoundsRef.current = currentBoundsSignature;
 
     try {
-      if (map.getZoom() < 3) {
-        setError("Zoom in further to load regional data.")
-        setLoading(false);
-        return;
-      }
-
       // Open the long-lived HTTP stream connection
       const response = await getSolarRegionData(lonMin, lonMax, latMin, latMax, date)
 
@@ -57,7 +51,7 @@ function SolarMap() {
         const {value, done} = await reader.read();
         if (done) break;
 
-        streamBuffer += decoder.decode(value, { stream: true });
+        streamBuffer += decoder.decode(value, {stream: true});
         const lines = streamBuffer.split('\n');
         streamBuffer = lines.pop() || "";
 
@@ -72,26 +66,22 @@ function SolarMap() {
               const rawChunkPoints = JSON.parse(jsonPayload);
 
               // Map the fresh batch
-              const newFeatures = rawChunkPoints.map((f: Record<string, number | undefined>) => {
-                const lon = f.longitude !== undefined ? f.longitude : f.Longitude;
-                const lat = f.latitude !== undefined ? f.latitude : f.Latitude;
-                const intensity = f.intensity !== undefined ? f.intensity : f.Intensity;
-
-                return {
-                  type: 'Feature',
-                  geometry: {
-                    type: 'Point',
-                    coordinates: [lon, lat]
-                  },
-                  properties: { intensity: intensity }
-                };
-              });
-
+              const newFeatures = mapRawPointsToGeoJsonFeatures(rawChunkPoints);
               accumulatedFeatures = [...accumulatedFeatures, ...newFeatures];
 
-              setSolarData({
-                type: 'FeatureCollection',
-                features: accumulatedFeatures
+              setSolarData((prevSolarData) => {
+                const existingFeatures = prevSolarData?.features || [];
+
+                const existingIds = new Set(existingFeatures.map(f => f.id));
+
+                const uniqueNewFeatures = accumulatedFeatures.filter(
+                  f => !existingIds.has(f.id)
+                );
+
+                return {
+                  type: "FeatureCollection",
+                  features: [...existingFeatures, ...uniqueNewFeatures],
+                }
               });
             } catch (e) {
               console.warn("Skipped a malformed or partial line segment:", e);
@@ -138,15 +128,15 @@ function SolarMap() {
         ['linear'],
         ['get', 'intensity'],
         0, 0,
-        25, 1
+        40, 1
       ],
       // Increase the heatmap color weight by zoom level
       'heatmap-intensity': [
         'interpolate',
-        ['linear'],
+        ['exponential', 1.25],
         ['zoom'],
-        0, 1,
-        9, 3
+        2.5, 1,
+        9, 7
       ],
       // The color gradient of the heatmap (Transparent -> Blue -> Yellow -> Red)
       'heatmap-color': [
@@ -163,17 +153,17 @@ function SolarMap() {
       // Adjust the heatmap radius by zoom level
       'heatmap-radius': [
         'interpolate',
-        ['linear'],
+        ['exponential', 1.5],
         ['zoom'],
-        0, 2,
-        9, 20
+        2.5, 19,
+        7, 150
       ],
       // Transition from heatmap to circle layer by zoom level
       'heatmap-opacity': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        7, 1,
+        6, 0.5,
         9, 0
       ]
     }
@@ -235,6 +225,7 @@ function SolarMap() {
       <Map
         ref={mapRef}
         initialViewState={{longitude: -95, latitude: 38, zoom: 4.5}}
+        minZoom={2.5}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
         onIdle={handleMapIdle}
       >

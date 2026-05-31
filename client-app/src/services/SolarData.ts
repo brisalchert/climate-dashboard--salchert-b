@@ -1,4 +1,6 @@
-﻿const BASE_URL = "/api/SolarData";
+﻿import type {Feature, Point} from "geojson";
+
+const BASE_URL = "/api/SolarData";
 
 export const getSolarPointData = async (lon: number, lat: number, date: string) => {
   return await fetch(`${BASE_URL}/point?lon=${lon}&lat=${lat}&date=${date}`)
@@ -26,4 +28,30 @@ export const getSolarRegionData = async (
 
   // Return the raw response container so the component can read its stream body
   return response;
+};
+
+/**
+ * Transforms raw points from the backend into standard GeoJSON Feature objects.
+ * Handles case-insensitive variations of longitude, latitude, and intensity.
+ */
+export function mapRawPointsToGeoJsonFeatures(
+  rawPoints: Record<string, number | undefined>[]
+): Feature<Point>[] {
+  return rawPoints.map((f) => {
+    // Guard against case variations from the backend API
+    const lon = f.longitude !== undefined ? f.longitude : (f.Longitude ?? 0);
+    const lat = f.latitude !== undefined ? f.latitude : (f.Latitude ?? 0);
+    const intensity = f.intensity !== undefined ? f.intensity : (f.Intensity ?? 0);
+
+    // Return the strictly structured GeoJSON Point Feature
+    return {
+      type: 'Feature',
+      id: `${lon.toFixed(5)},${lat.toFixed(5)}`,
+      geometry: {
+        type: 'Point',
+        coordinates: [lon, lat]
+      },
+      properties: {intensity}
+    };
+  });
 };
