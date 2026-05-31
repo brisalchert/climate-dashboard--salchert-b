@@ -51,5 +51,6 @@ public class NasaPowerServiceTests
     result.Latitude.Should().Be(40.5);
     result.Longitude.Should().Be(-89.5);
     result.Elevation.Should().Be(180.0);
+    result.Date.Should().Be("20230101");
   }
 }

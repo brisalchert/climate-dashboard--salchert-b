@@ -3,4 +3,5 @@
   longitude: number;
   elevation: number;
   intensity: number;
+  date: string;
 }

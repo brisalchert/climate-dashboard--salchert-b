@@ -39,18 +39,19 @@ export const getSolarRegionData = async (
  * Handles case-insensitive variations of longitude, latitude, and intensity.
  */
 export function mapRawPointsToGeoJsonFeatures(
-  rawPoints: Record<string, number | undefined>[]
+  rawPoints: Record<string, undefined>[]
 ): Feature<Point>[] {
   return rawPoints.map((f) => {
     // Guard against case variations from the backend API
     const lon = f.longitude !== undefined ? f.longitude : (f.Longitude ?? 0);
     const lat = f.latitude !== undefined ? f.latitude : (f.Latitude ?? 0);
     const intensity = f.intensity !== undefined ? f.intensity : (f.Intensity ?? 0);
+    const date: string = f.date !== undefined ? f.date : (f.Date ?? "");
 
     // Return the strictly structured GeoJSON Point Feature
     return {
       type: 'Feature',
-      id: `${lon.toFixed(5)},${lat.toFixed(5)}`,
+      id: `${lon.toFixed(5)},${lat.toFixed(5)},${date}`,
       geometry: {
         type: 'Point',
         coordinates: [lon, lat]

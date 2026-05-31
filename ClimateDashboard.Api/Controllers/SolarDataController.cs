@@ -76,11 +76,6 @@ public class SolarDataController(
         var currentLon = ((lon + 180) % 360 + 360) % 360 - 180;
         var currentLat = lat;
 
-        logger.LogDebug(
-          "Fetching chunk for lonMin: {lonMin}, lonMax: {lonMax}, latMin: {LatMin}, latMax: {LatMax}, Date: {Date}",
-          currentLon, currentLon + step, currentLat, currentLat + step, date.ToString("yyyy-MM-dd")
-        );
-
         tasks.Add(Task.Run(async () =>
         {
           if (clientDisconnectedToken.IsCancellationRequested) return;

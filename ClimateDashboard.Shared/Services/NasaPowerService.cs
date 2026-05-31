@@ -47,14 +47,15 @@ internal class NasaPowerService(
 
     var data = await response.Content.ReadFromJsonAsync<NasaSolarPointResponse>(options);
 
-    if (data?.Properties == null) return new SolarPoint();
+    if (data?.Properties == null) return new SolarPoint { Date = formattedDate };
 
     return new SolarPoint
     {
       Longitude = data.Geometry.Coordinates[0],
       Latitude = data.Geometry.Coordinates[1],
       Elevation = data.Geometry.Coordinates[2],
-      Intensity = data.Properties.Parameter["ALLSKY_SFC_SW_DWN"].Values.FirstOrDefault()
+      Intensity = data.Properties.Parameter["ALLSKY_SFC_SW_DWN"].Values.FirstOrDefault(),
+      Date = formattedDate
     };
   }
 
@@ -106,7 +107,8 @@ internal class NasaPowerService(
       Longitude = feature.Geometry.Coordinates[0],
       Latitude = feature.Geometry.Coordinates[1],
       Elevation = feature.Geometry.Coordinates[2],
-      Intensity = feature.Properties.Parameter["ALLSKY_SFC_SW_DWN"].Values.FirstOrDefault()
+      Intensity = feature.Properties.Parameter["ALLSKY_SFC_SW_DWN"].Values.FirstOrDefault(),
+      Date = formattedDate
     }).ToList();
 
     cache.Set(cacheKey, freshFeatures, TimeSpan.FromHours(24));

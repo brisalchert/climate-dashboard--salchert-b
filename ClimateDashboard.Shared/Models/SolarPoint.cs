@@ -6,4 +6,5 @@ public class SolarPoint
   public double Longitude { get; init; }
   public double Elevation { get; init; }
   public double Intensity { get; init; }
+  public required string Date { get; init; }
 }

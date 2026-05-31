@@ -2,9 +2,10 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type {FeatureCollection, Feature, Point} from 'geojson';
 import '../styles/SolarMap.css'
-import {useCallback, useEffect, useRef, useState} from "react";
+import {type ChangeEvent, useCallback, useEffect, useRef, useState} from "react";
 import {getSolarRegionData, mapRawPointsToGeoJsonFeatures} from "../services/SolarData.ts";
 import {LngLatBounds} from "maplibre-gl";
+import dayjs from 'dayjs';
 
 function normalizeLongitude(lon: number): number {
   return ((lon + 180) % 360 + 360) % 360 - 180;
@@ -22,8 +23,11 @@ function SolarMap() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mapBounds, setMapBounds] = useState<LngLatBounds>(new LngLatBounds());
+  const [date, setDate] = useState<string>(dayjs().subtract(7, 'day').format('YYYY-MM-DD'));
+  const reloadRef = useRef<boolean>(true);
 
   const fetchMapBoundsData = useCallback(async (map: MapRef) => {
+    reloadRef.current = false;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -38,7 +42,6 @@ function SolarMap() {
     const lonMax = bounds.getEast();
     const latMin = bounds.getSouth();
     const latMax = bounds.getNorth();
-    const date = "2026-04-08";
 
     const neededGrids: string[] = [];
     const missingGrids: { lonMin: number, lonMax: number, latMin: number, latMax: number, date: string }[] = [];
@@ -61,7 +64,6 @@ function SolarMap() {
     }
 
     if (missingGrids.length === 0) {
-      console.log("nothing to do")
       return;
     }
 
@@ -146,11 +148,15 @@ function SolarMap() {
         setError(message);
       }
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current == controller) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [date]);
 
   const handleMapIdle = useCallback(() => {
+    if (!reloadRef.current) return;
+
     // Clear old active timers
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -158,10 +164,29 @@ function SolarMap() {
 
     debounceTimerRef.current = setTimeout(() => {
       if (mapRef.current) {
-        console.log("fetching data");
-        fetchMapBoundsData(mapRef.current);
+        fetchMapBoundsData(mapRef.current).then(() => console.log("Successfully fetched solar data"));
       }
-    }, 600);
+    }, 800);
+  }, [fetchMapBoundsData]);
+
+  const handleUserInteraction = useCallback(() => {
+    reloadRef.current = true;
+  }, []);
+
+  const handleDateChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    reloadRef.current = true;
+
+    setSolarData({
+      type: 'FeatureCollection',
+      features: []
+    });
+
+    loadedGridsRef.current.clear();
+    setDate(e.target.value);
+
+    if (mapRef.current) {
+      fetchMapBoundsData(mapRef.current).then(() => console.log("Successfully fetched solar data"));
+    }
   }, [fetchMapBoundsData]);
 
   // Clean up timers if the component unmounts mid-drag to avoid memory leaks
@@ -266,16 +291,16 @@ function SolarMap() {
       {/* Sidebar Overlay for future controls */}
       <div className={"map-overlay"}>
         <h2 className={"map-overlay-title"}>Climate Dashboard</h2>
+        <input id={"date-field"} type={"date"} value={date} onChange={handleDateChange}/>
         {loading && <p className={"map-overlay-description"}>Loading regional metrics...</p>}
         {error && <p className={"map-overlay-description"} style={{color: '#e74c3c'}}>{error}</p>}
         {!loading && (
           <p className={"map-overlay-description"}>
             Displaying {solarData.features.length} data points rendered via WebGL.
             <br/>
-            Longitude: {normalizeLongitude(Math.round(mapBounds.getWest()))}°
-            to {normalizeLongitude(Math.round(mapBounds.getEast()))}°
+            Longitude: {normalizeLongitude(Math.round(mapBounds.getCenter().lng))}°
             <br/>
-            Latitude: {Math.round(mapBounds.getSouth())}° to {Math.round(mapBounds.getNorth())}°
+            Latitude: {Math.round(mapBounds.getCenter().lat)}°
           </p>
         )}
       </div>
@@ -287,6 +312,8 @@ function SolarMap() {
         minZoom={2.5}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
         onIdle={handleMapIdle}
+        onZoom={handleUserInteraction}
+        onDrag={handleUserInteraction}
       >
         {/* Render the Heatmap Source and Layer */}
         <Source id="solar-data" type="geojson" data={solarData}>
