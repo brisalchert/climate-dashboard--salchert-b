@@ -11,6 +11,8 @@ public interface INasaPowerService
 
   Task<List<SolarPoint>> GetNasaSolarRegionAsync(double longitudeMin, double longitudeMax, double latitudeMin,
     double latitudeMax, DateTime date);
+
+  bool IsRegionCached(double longitudeMin, double longitudeMax, double latitudeMin, double latitudeMax, DateTime date);
 }
 
 internal class NasaPowerService(
@@ -18,6 +20,8 @@ internal class NasaPowerService(
   IMemoryCache cache
 ) : INasaPowerService
 {
+  private const string ApiKey = "c9v2ZeKv6h2kaI08hIOYQnAPRcXM1IQCRyR9nbKp";
+
   public async Task<SolarPoint> GetSolarPointAsync(double longitude, double latitude, DateTime date)
   {
     // Convert datetime to proper format
@@ -27,7 +31,9 @@ internal class NasaPowerService(
     var url = $"https://power.larc.nasa.gov/api/temporal/daily/point" +
               $"?longitude={longitude}&latitude={latitude}" +
               $"&parameters=ALLSKY_SFC_SW_DWN&community=RE&format=JSON" +
-              $"&start={formattedDate}&end={formattedDate}";
+              $"&start={formattedDate}&end={formattedDate}" +
+              $"&header=true" +
+              $"&api_key={ApiKey}";
 
     // Case-insensitive matching helps prevent 500 errors during deserialization
     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -61,7 +67,7 @@ internal class NasaPowerService(
         $"Invalid coordinate ranges provided: {longitudeMin}, {latitudeMin} to {longitudeMax}, {latitudeMax}");
     }
 
-    string cacheKey = $"solar_{longitudeMin}_{longitudeMax}_{latitudeMin}_{latitudeMax}_{date:yyyyMMdd}";
+    var cacheKey = $"solar_{longitudeMin}_{longitudeMax}_{latitudeMin}_{latitudeMax}_{date:yyyyMMdd}";
 
     if (cache.TryGetValue(cacheKey, out List<SolarPoint>? cachedFeatures) && cachedFeatures != null)
     {
@@ -76,7 +82,9 @@ internal class NasaPowerService(
               $"?start={formattedDate}&end={formattedDate}" +
               $"&longitude-min={longitudeMin}&longitude-max={longitudeMax}" +
               $"&latitude-min={latitudeMin}&latitude-max={latitudeMax}" +
-              $"&community=ag&parameters=ALLSKY_SFC_SW_DWN&header=true";
+              $"&community=ag&parameters=ALLSKY_SFC_SW_DWN" +
+              $"&header=true" +
+              $"&api_key={ApiKey}";
 
     // Case-insensitive matching helps prevent 500 errors during deserialization
     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -104,5 +112,13 @@ internal class NasaPowerService(
     cache.Set(cacheKey, freshFeatures, TimeSpan.FromHours(24));
 
     return freshFeatures;
+  }
+
+  public bool IsRegionCached(double longitudeMin, double longitudeMax, double latitudeMin, double latitudeMax,
+    DateTime date)
+  {
+    var cacheKey = $"solar_{longitudeMin}_{longitudeMax}_{latitudeMin}_{latitudeMax}_{date:yyyyMMdd}";
+
+    return cache.TryGetValue(cacheKey, out _);
   }
 }

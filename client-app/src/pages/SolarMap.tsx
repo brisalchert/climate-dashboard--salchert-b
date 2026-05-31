@@ -4,6 +4,11 @@ import type {FeatureCollection, Feature, Point} from 'geojson';
 import '../styles/SolarMap.css'
 import {useCallback, useEffect, useRef, useState} from "react";
 import {getSolarRegionData, mapRawPointsToGeoJsonFeatures} from "../services/SolarData.ts";
+import {LngLatBounds} from "maplibre-gl";
+
+function normalizeLongitude(lon: number): number {
+  return ((lon + 180) % 360 + 360) % 360 - 180;
+}
 
 function SolarMap() {
   const [solarData, setSolarData] = useState<FeatureCollection<Point>>({
@@ -12,32 +17,73 @@ function SolarMap() {
   });
   const mapRef = useRef<MapRef | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFetchedBoundsRef = useRef<string>("");
+  const loadedGridsRef = useRef<Set<string>>(new Set());
+  const abortControllerRef = useRef<AbortController>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [mapBounds, setMapBounds] = useState<LngLatBounds>(new LngLatBounds());
 
   const fetchMapBoundsData = useCallback(async (map: MapRef) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const bounds = map.getBounds();
+    setMapBounds(bounds);
+
     const lonMin = bounds.getWest();
     const lonMax = bounds.getEast();
     const latMin = bounds.getSouth();
     const latMax = bounds.getNorth();
     const date = "2026-04-08";
 
-    const currentBoundsSignature = `${Math.round(lonMin)},${Math.round(lonMax)},${Math.round(latMin)},${Math.round(latMax)}`;
+    const neededGrids: string[] = [];
+    const missingGrids: { lonMin: number, lonMax: number, latMin: number, latMax: number, date: string }[] = [];
 
-    // If map layout has not changed, do not fetch data
-    if (currentBoundsSignature === lastFetchedBoundsRef.current) {
+    for (let lon = lonMin; lon <= lonMax; lon++) {
+      for (let lat = latMin; lat <= latMax; lat++) {
+        const gridKey = `${lon},${lat},${date}`;
+        neededGrids.push(gridKey);
+
+        if (!loadedGridsRef.current.has(gridKey)) {
+          missingGrids.push({
+            lonMin: lon,
+            lonMax: lon + 1,
+            latMin: lat,
+            latMax: lat + 1,
+            date: date
+          });
+        }
+      }
+    }
+
+    if (missingGrids.length === 0) {
+      console.log("nothing to do")
       return;
     }
 
     setLoading(true);
     setError(null);
-    lastFetchedBoundsRef.current = currentBoundsSignature;
 
     try {
+      // Get the smallest necessary bounding box
+      const missingLonMin = Math.min(...missingGrids.map(grid => grid.lonMin));
+      const missingLonMax = Math.max(...missingGrids.map(grid => grid.lonMax));
+      const missingLatMin = Math.min(...missingGrids.map(grid => grid.latMin));
+      const missingLatMax = Math.max(...missingGrids.map(grid => grid.latMax));
+
       // Open the long-lived HTTP stream connection
-      const response = await getSolarRegionData(lonMin, lonMax, latMin, latMax, date)
+      const response = await getSolarRegionData(
+        missingLonMin,
+        missingLonMax,
+        missingLatMin,
+        missingLatMax,
+        date,
+        controller
+      );
 
       if (!response.body) return;
       const reader = response.body.getReader();
@@ -71,9 +117,7 @@ function SolarMap() {
 
               setSolarData((prevSolarData) => {
                 const existingFeatures = prevSolarData?.features || [];
-
                 const existingIds = new Set(existingFeatures.map(f => f.id));
-
                 const uniqueNewFeatures = accumulatedFeatures.filter(
                   f => !existingIds.has(f.id)
                 );
@@ -89,9 +133,18 @@ function SolarMap() {
           }
         }
       }
+
+      // Add all grids to the loaded grids reference
+      neededGrids.forEach((gridKey) => {
+        loadedGridsRef.current.add(gridKey)
+      });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to load climate data.";
-      setError(message);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log("Successfully swallowed an aborted request stream.");
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to load climate data.";
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -105,6 +158,7 @@ function SolarMap() {
 
     debounceTimerRef.current = setTimeout(() => {
       if (mapRef.current) {
+        console.log("fetching data");
         fetchMapBoundsData(mapRef.current);
       }
     }, 600);
@@ -188,11 +242,11 @@ function SolarMap() {
         ['linear'],
         ['get', 'intensity'],
         1, 'rgba(33,102,172,0)',
-        2, 'rgb(103,169,207)',
-        3, 'rgb(209,229,240)',
-        4, 'rgb(253,219,199)',
-        5, 'rgb(239,138,98)',
-        6, 'rgb(178,24,43)'
+        5, 'rgb(103,169,207)',
+        10, 'rgb(209,229,240)',
+        15, 'rgb(253,219,199)',
+        20, 'rgb(239,138,98)',
+        25, 'rgb(178,24,43)'
       ],
       'circle-stroke-color': 'white',
       'circle-stroke-width': 1,
@@ -217,6 +271,11 @@ function SolarMap() {
         {!loading && (
           <p className={"map-overlay-description"}>
             Displaying {solarData.features.length} data points rendered via WebGL.
+            <br/>
+            Longitude: {normalizeLongitude(Math.round(mapBounds.getWest()))}°
+            to {normalizeLongitude(Math.round(mapBounds.getEast()))}°
+            <br/>
+            Latitude: {Math.round(mapBounds.getSouth())}° to {Math.round(mapBounds.getNorth())}°
           </p>
         )}
       </div>

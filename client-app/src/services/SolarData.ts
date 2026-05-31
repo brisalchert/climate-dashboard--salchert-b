@@ -15,11 +15,15 @@ export const getSolarRegionData = async (
   lonMax: number,
   latMin: number,
   latMax: number,
-  date: string
+  date: string,
+  controller: AbortController
 ): Promise<Response> => {
 
   const response = await fetch(
-    `${BASE_URL}/region?lonMin=${lonMin}&lonMax=${lonMax}&latMin=${latMin}&latMax=${latMax}&date=${date}`
+    `${BASE_URL}/region?lonMin=${lonMin}&lonMax=${lonMax}&latMin=${latMin}&latMax=${latMax}&date=${date}`,
+    {
+      signal: controller.signal
+    }
   );
 
   if (!response.ok) {
@@ -54,4 +58,4 @@ export function mapRawPointsToGeoJsonFeatures(
       properties: {intensity}
     };
   });
-};
+}

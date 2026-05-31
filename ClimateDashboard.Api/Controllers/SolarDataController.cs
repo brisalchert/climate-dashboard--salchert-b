@@ -15,25 +15,28 @@ public class SolarDataController(
   [HttpGet("point")]
   public async Task<IActionResult> GetPointData(double lon, double lat, DateTime date)
   {
-    if (logger.IsEnabled(LogLevel.Information))
-    {
-      logger.LogInformation("Fetching solar data for Lon: {Lon}, Lat: {Lat}, Date: {Date}",
-        lon, lat, date.ToString("yyyy-MM-dd"));
-    }
-
     try
     {
-      var feature = await nasaPowerService.GetSolarPointAsync(lon, lat, date);
       if (logger.IsEnabled(LogLevel.Information))
       {
-        logger.LogInformation("Successfully retrieved feature");
+        logger.LogInformation("Fetching solar data for Lon: {Lon}, Lat: {Lat}, Date: {Date}",
+          lon, lat, date.ToString("yyyy-MM-dd"));
+      }
+
+      var feature = await nasaPowerService.GetSolarPointAsync(lon, lat, date);
+
+      if (logger.IsEnabled(LogLevel.Information))
+      {
+        logger.LogInformation("Successfully retrieved solar data for Lon: {Lon}, Lat: {Lat}, Date: {Date}",
+          lon, lat, date.ToString("yyyy-MM-dd"));
       }
 
       return Ok(feature);
     }
     catch (Exception ex)
     {
-      logger.LogError(ex, "Error occurred while calling NASA API for Date: {Date}", date);
+      logger.LogError(ex, "Error occurred while calling NASA API for Lon: {Lon}, Lat: {Lat}, Date: {Date}",
+        lon, lat, date.ToString("yyyy-MM-dd"));
 
       return Problem("Failed to retrieve data from NASA. Check server logs for details.");
     }
@@ -44,10 +47,12 @@ public class SolarDataController(
     [FromQuery] double lonMin, [FromQuery] double lonMax,
     [FromQuery] double latMin, [FromQuery] double latMax, [FromQuery] DateTime date)
   {
+    var clientDisconnectedToken = HttpContext.RequestAborted;
+
     if (logger.IsEnabled(LogLevel.Information))
     {
       logger.LogInformation(
-        "Fetching solar region data for LonMin: {LonMin}, LonMax{LonMax}, LatMin: {LatMin}, LatMax: {LatMax}, Date: {Date}",
+        "Fetching solar data for LonMin: {LonMin}, LonMax: {LonMax}, LatMin: {LatMin}, LatMax: {LatMax}, Date: {Date}",
         lonMin, lonMax, latMin, latMax, date.ToString("yyyy-MM-dd"));
     }
 
@@ -56,8 +61,7 @@ public class SolarDataController(
     Response.Headers.Append("Connection", "keep-alive");
 
     const double step = 10.0;
-    var concurrencySemaphore = new SemaphoreSlim(3, 3);
-    var streamSemaphore = new SemaphoreSlim(1, 1);
+    var concurrencySemaphore = new SemaphoreSlim(1, 1);
     var tasks = new List<Task>();
 
     var startLon = Math.Floor(lonMin / 10) * 10;
@@ -69,79 +73,73 @@ public class SolarDataController(
     {
       for (var lat = startLat; lat < endLat; lat += step)
       {
-        var currentLon = lon;
+        var currentLon = ((lon + 180) % 360 + 360) % 360 - 180;
         var currentLat = lat;
+
+        logger.LogDebug(
+          "Fetching chunk for lonMin: {lonMin}, lonMax: {lonMax}, latMin: {LatMin}, latMax: {LatMax}, Date: {Date}",
+          currentLon, currentLon + step, currentLat, currentLat + step, date.ToString("yyyy-MM-dd")
+        );
 
         tasks.Add(Task.Run(async () =>
         {
-          await concurrencySemaphore.WaitAsync();
+          if (clientDisconnectedToken.IsCancellationRequested) return;
+
+          await concurrencySemaphore.WaitAsync(clientDisconnectedToken);
           try
           {
-            await Task.Delay(250);
+            if (!nasaPowerService.IsRegionCached(currentLon, currentLon + step, currentLat, currentLat + step, date))
+            {
+              await Task.Delay(500, clientDisconnectedToken);
+            }
 
             var result = await GetStandardizedChunk(currentLon, currentLon + step, currentLat, currentLat + step, date);
 
             if (result is OkObjectResult { Value: { } value })
             {
               var jsonChunk = JsonSerializer.Serialize(value);
-              await streamSemaphore.WaitAsync();
-              try
-              {
-                // Clean, non-blocking asynchronous streaming execution
-                await Response.WriteAsync($"data: {jsonChunk}\n\n");
-                await Response.Body.FlushAsync();
-              }
-              finally
-              {
-                streamSemaphore.Release(); // Free the stream gate for the next chunk
-              }
+              await Response.WriteAsync($"data: {jsonChunk}\n\n", clientDisconnectedToken);
+              await Response.Body.FlushAsync(clientDisconnectedToken);
             }
+          }
+          catch (OperationCanceledException)
+          {
+            logger.LogWarning("Request was cancelled.");
           }
           finally
           {
             concurrencySemaphore.Release();
           }
-        }));
+        }, clientDisconnectedToken));
       }
     }
 
     await Task.WhenAll(tasks);
-  }
-
-  // GET request for solar region data
-  [HttpGet("chunk")]
-  public async Task<IActionResult> GetStandardizedChunk(double lonMin, double lonMax, double latMin, double latMax,
-    DateTime date)
-  {
-    // Block external calls to this endpoint
-    var isLocal = HttpContext.Connection.RemoteIpAddress == null ||
-                  HttpContext.Connection.RemoteIpAddress.Equals(HttpContext.Connection.LocalIpAddress);
-
-    if (!isLocal)
-    {
-      return Forbid("Direct access to sub-chunks is restricted.");
-    }
 
     if (logger.IsEnabled(LogLevel.Information))
     {
       logger.LogInformation(
-        "Fetching solar chunk data for LonMin: {LonMin}, LonMax{LonMax}, LatMin: {LatMin}, LatMax: {LatMax}, Date: {Date}",
+        "Successfully retrieved solar data for LonMin: {LonMin}, LonMax: {LonMax}, LatMin: {LatMin}, LatMax: {LatMax}, Date: {Date}",
         lonMin, lonMax, latMin, latMax, date.ToString("yyyy-MM-dd"));
     }
+  }
 
+  // GET request for solar region data
+  [HttpGet("chunk")]
+  private async Task<IActionResult> GetStandardizedChunk(double lonMin, double lonMax, double latMin, double latMax,
+    DateTime date)
+  {
     try
     {
       var features = await nasaPowerService.GetNasaSolarRegionAsync(lonMin, lonMax, latMin, latMax, date);
-      if (logger.IsEnabled(LogLevel.Information))
-      {
-        logger.LogInformation("Successfully retrieved {Features} features", features.Count);
-      }
 
       return Ok(features);
     }
     catch (Exception ex)
     {
-      logger.LogError(ex, "Error occurred while calling NASA API for Date: {Date}", date);
+      logger.LogError(ex,
+        "Error occurred while calling NASA API for for LonMin: {LonMin}, LonMax: {LonMax}, LatMin: {LatMin}, LatMax: {LatMax}, Date: {Date}",
+        lonMin, lonMax, latMin, latMax, date.ToString("yyyy-MM-dd"));
 
       return Problem("Failed to retrieve data from NASA. Check server logs for details.");
     }
